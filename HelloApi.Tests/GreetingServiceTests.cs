@@ -11,7 +11,7 @@ public class GreetingServiceTests
     {
         var result = _sut.Greet("Berka");
 
-        Assert.Equal("Hello, Berka! CI/CD is working.", result);
+        Assert.Equal("Merhaba, Berka! CI/CD sanal makinede calisiyor.", result);
     }
 
     [Theory]

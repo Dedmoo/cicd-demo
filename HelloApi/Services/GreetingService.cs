@@ -7,6 +7,6 @@ public class GreetingService
         if (string.IsNullOrWhiteSpace(name))
             throw new ArgumentException("Name cannot be empty.", nameof(name));
 
-        return $"Hello, {name}! CI/CD is working.";
+        return $"Merhaba, {name}! CI/CD sanal makinede calisiyor.";
     }
 }
