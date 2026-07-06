@@ -1,4 +1,4 @@
-name: CI
+name: CI/CD
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
     branches: [ main ]
 
 jobs:
-  build-and-test:
+  build-test-deploy:
     runs-on: self-hosted
 
     steps:
@@ -27,3 +27,12 @@ jobs:
 
       - name: Testleri çalıştır
         run: dotnet test --no-build --configuration Release --verbosity normal
+
+      - name: Yayınla (publish)
+        run: dotnet publish HelloApi/HelloApi.csproj --configuration Release --output /opt/helloapi
+
+      - name: Çalışan uygulamayı durdur
+        run: pkill -f "HelloApi.dll" || true
+
+      - name: Yeni versiyonu başlat
+        run: nohup dotnet /opt/helloapi/HelloApi.dll --urls "http://0.0.0.0:5191" > /tmp/helloapi.log 2>&1 &
