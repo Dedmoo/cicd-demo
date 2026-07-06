@@ -29,10 +29,7 @@ jobs:
         run: dotnet test --no-build --configuration Release --verbosity normal
 
       - name: Yayınla (publish)
-        run: dotnet publish HelloApi/HelloApi.csproj --configuration Release --output /opt/helloapi
+        run: dotnet publish HelloApi/HelloApi.csproj --configuration Release --runtime linux-x64 --self-contained true --output /opt/helloapi
 
-      - name: Çalışan uygulamayı durdur
-        run: pkill -f "HelloApi.dll" || true
-
-      - name: Yeni versiyonu başlat
-        run: nohup dotnet /opt/helloapi/HelloApi.dll --urls "http://0.0.0.0:5191" > /tmp/helloapi.log 2>&1 &
+      - name: Servisi yeniden başlat
+        run: systemctl restart helloapi
