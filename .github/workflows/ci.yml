@@ -20,16 +20,16 @@ jobs:
           dotnet-version: '8.0.x'
 
       - name: Bağımlılıkları yükle (restore)
-        run: dotnet restore
+        run: dotnet restore /p:UseSharedCompilation=false
 
       - name: Projeyi derle (build)
-        run: dotnet build --no-restore --configuration Release
+        run: dotnet build --no-restore --configuration Release /p:UseSharedCompilation=false
 
       - name: Testleri çalıştır
-        run: dotnet test --no-build --configuration Release --verbosity normal
+        run: dotnet test --no-build --configuration Release --verbosity normal /p:UseSharedCompilation=false
 
       - name: Yayınla (publish)
-        run: dotnet publish HelloApi/HelloApi.csproj --configuration Release --output /opt/helloapi
+        run: dotnet publish HelloApi/HelloApi.csproj --configuration Release --output /opt/helloapi /p:UseSharedCompilation=false
 
       - name: Servisi yeniden başlat
         run: |
