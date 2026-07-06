@@ -32,4 +32,7 @@ jobs:
         run: dotnet publish HelloApi/HelloApi.csproj --configuration Release --output /opt/helloapi
 
       - name: Servisi yeniden başlat
-        run: systemctl restart helloapi
+        run: |
+          pkill -f 'dotnet /opt/helloapi' || true
+          sleep 1
+          systemctl restart helloapi
