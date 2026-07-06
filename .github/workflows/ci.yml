@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Kodu indir (checkout)
+        uses: actions/checkout@v4
+
+      - name: .NET 8 kur
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Bağımlılıkları yükle (restore)
+        run: dotnet restore
+
+      - name: Projeyi derle (build)
+        run: dotnet build --no-restore --configuration Release
+
+      - name: Testleri çalıştır
+        run: dotnet test --no-build --configuration Release --verbosity normal
