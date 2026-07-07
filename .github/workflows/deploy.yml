@@ -1,7 +1,14 @@
-name: Deploy
+name: Deploy (Canliya Al)
 
 on:
   workflow_dispatch:
+    inputs:
+      aciklama:
+        description: 'Ne degisti / neden canliya aliniyor'
+        required: true
+        type: string
+
+run-name: Deploy - ${{ github.actor }} - ${{ inputs.aciklama }}
 
 concurrency:
   group: wsl-self-hosted-runner
@@ -12,6 +19,12 @@ jobs:
     runs-on: self-hosted
 
     steps:
+      - name: Deploy bilgisi
+        run: |
+          echo "Deploy eden: ${{ github.actor }}"
+          echo "Aciklama: ${{ inputs.aciklama }}"
+          echo "Commit: ${{ github.sha }}"
+
       - name: Kodu indir (checkout)
         uses: actions/checkout@v4
 
