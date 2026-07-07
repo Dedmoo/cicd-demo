@@ -26,13 +26,11 @@ jobs:
           fi
           DOTNET_VERSION=$(dotnet --version)
           echo "Makinedeki .NET SDK: $DOTNET_VERSION"
-          case "$DOTNET_VERSION" in
-            8.*) ;;
-            *)
-              echo "NET 8 SDK gerekli, bulunan: $DOTNET_VERSION"
-              exit 1
-              ;;
-          esac
+          DOTNET_MAJOR=$(echo "$DOTNET_VERSION" | cut -d. -f1)
+          if [ "$DOTNET_MAJOR" -lt 8 ]; then
+            echo "NET 8 veya ustu SDK gerekli, bulunan: $DOTNET_VERSION"
+            exit 1
+          fi
 
       - name: Bağımlılıkları yükle (restore)
         run: dotnet restore /p:UseSharedCompilation=false
