@@ -81,7 +81,7 @@ jobs:
           systemctl restart helloapi
 
       - name: Canli saglik kontrolu
-        run: bash .github/scripts/verify-health.sh http://127.0.0.1:5191/health
+        run: bash .github/scripts/verify-health.sh http://127.0.0.1:5191
 
       - name: Rollback ozeti
         if: always()

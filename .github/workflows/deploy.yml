@@ -122,7 +122,7 @@ jobs:
       - name: Canli saglik kontrolu
         id: health
         continue-on-error: true
-        run: bash .github/scripts/verify-health.sh http://127.0.0.1:5191/health
+        run: bash .github/scripts/verify-health.sh http://127.0.0.1:5191
 
       - name: Saglik basarisiz - otomatik geri al
         if: steps.health.outcome == 'failure'
@@ -130,7 +130,7 @@ jobs:
           if [ -d /opt/helloapi.previous ]; then
             echo "Health check patladi, onceki surume otomatik geri aliniyor..."
             bash .github/scripts/rollback-to-previous.sh
-            bash .github/scripts/verify-health.sh http://127.0.0.1:5191/health || true
+            bash .github/scripts/verify-health.sh http://127.0.0.1:5191 || true
             echo "- Otomatik rollback yapildi (health check fail)" >> "$GITHUB_STEP_SUMMARY"
           else
             echo "Health check patladi ama onceki surum yok."
