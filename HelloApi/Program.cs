@@ -5,7 +5,7 @@ builder.Services.AddSingleton<GreetingService>();
 
 var app = builder.Build();
 
-app.MapGet("/", () => "Merhaba Creamobile! deneme12345  - otomatik deploy calisiyor.");
+app.MapGet("/", () => "Merhaba Creamobile! deneme12344445  - otomatik deploy calisiyor.");
 
 app.MapGet("/health", () => Results.Ok(new { status = "ok", service = "helloapi" }));
 
