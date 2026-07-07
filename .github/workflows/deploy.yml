@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       aciklama:
-        description: 'Ne degisti / neden canliya aliniyor'
+        description: 'Ne deploy ediliyor (ornek: deneme45 canliya al)'
         required: true
         type: string
 
@@ -19,14 +19,22 @@ jobs:
     runs-on: self-hosted
 
     steps:
-      - name: Deploy bilgisi
-        run: |
-          echo "Deploy eden: ${{ github.actor }}"
-          echo "Aciklama: ${{ inputs.aciklama }}"
-          echo "Commit: ${{ github.sha }}"
-
       - name: Kodu indir (checkout)
         uses: actions/checkout@v4
+
+      - name: Deploy ozeti
+        run: |
+          COMMIT_MSG=$(git log -1 --pretty=%s)
+          COMMIT_AUTHOR=$(git log -1 --pretty=%an)
+          echo "Deploy eden (buton): ${{ github.actor }}"
+          echo "Commit mesaji: $COMMIT_MSG"
+          echo "Commit atan: $COMMIT_AUTHOR"
+          echo "Deploy notu: ${{ inputs.aciklama }}"
+          echo "## Deploy Ozeti" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Deploy eden: **${{ github.actor }}**" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Commit: $COMMIT_MSG" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Commit atan: $COMMIT_AUTHOR" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Not: ${{ inputs.aciklama }}" >> "$GITHUB_STEP_SUMMARY"
 
       - name: .NET 8 kur
         uses: actions/setup-dotnet@v4
