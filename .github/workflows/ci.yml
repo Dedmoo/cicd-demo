@@ -5,6 +5,7 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
+  workflow_dispatch:
 
 jobs:
   build-test-deploy:
@@ -29,9 +30,11 @@ jobs:
         run: dotnet test --no-build --configuration Release --verbosity normal /p:UseSharedCompilation=false
 
       - name: Yayınla (publish)
+        if: github.event_name == 'workflow_dispatch'
         run: dotnet publish HelloApi/HelloApi.csproj --configuration Release --output /opt/helloapi /p:UseSharedCompilation=false
 
       - name: Servisi yeniden başlat
+        if: github.event_name == 'workflow_dispatch'
         run: |
           pkill -f 'dotnet /opt/helloapi' || true
           sleep 1
