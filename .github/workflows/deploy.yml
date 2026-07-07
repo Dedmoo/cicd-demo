@@ -36,10 +36,19 @@ jobs:
           echo "- Commit atan: $COMMIT_AUTHOR" >> "$GITHUB_STEP_SUMMARY"
           echo "- Not: ${{ inputs.aciklama }}" >> "$GITHUB_STEP_SUMMARY"
 
-      - name: .NET 8 kur
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '8.0.x'
+      - name: .NET surumunu dogrula
+        run: |
+          if ! command -v dotnet >/dev/null 2>&1; then
+            echo "dotnet bulunamadi. WSL uzerinde .NET 8 SDK kurulu olmali."
+            exit 1
+          fi
+          DOTNET_VERSION=$(dotnet --version)
+          echo "Makinedeki .NET SDK: $DOTNET_VERSION"
+          DOTNET_MAJOR=$(echo "$DOTNET_VERSION" | cut -d. -f1)
+          if [ "$DOTNET_MAJOR" -lt 8 ]; then
+            echo "NET 8 veya ustu SDK gerekli, bulunan: $DOTNET_VERSION"
+            exit 1
+          fi
 
       - name: Bagimliliklari yukle (restore)
         run: dotnet restore /p:UseSharedCompilation=false
@@ -50,8 +59,30 @@ jobs:
       - name: Testleri calistir
         run: dotnet test --no-build --configuration Release --verbosity normal /p:UseSharedCompilation=false
 
+      - name: Mevcut surumu yedekle
+        run: |
+          if [ -d /opt/helloapi ]; then
+            rm -rf /opt/helloapi.previous
+            cp -a /opt/helloapi /opt/helloapi.previous
+            echo "Onceki surum /opt/helloapi.previous olarak saklandi"
+            echo "- Onceki surum yedeklendi (rollback icin)" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Ilk deploy, geri alinacak onceki surum yok"
+          fi
+
       - name: Yayinla (publish)
-        run: dotnet publish HelloApi/HelloApi.csproj --configuration Release --output /opt/helloapi /p:UseSharedCompilation=false
+        run: |
+          STAGING=$(mktemp -d)
+          dotnet publish HelloApi/HelloApi.csproj --configuration Release --output "$STAGING" /p:UseSharedCompilation=false
+          mkdir -p /opt/helloapi
+          rsync -a --delete "$STAGING/" /opt/helloapi/
+          rm -rf "$STAGING"
+          cat > /opt/helloapi/.deploy-info <<EOF
+          deploy_time=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          commit=${{ github.sha }}
+          deployed_by=${{ github.actor }}
+          note=${{ inputs.aciklama }}
+          EOF
 
       - name: Servisi yeniden baslat
         run: |

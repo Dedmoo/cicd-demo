@@ -1,0 +1,48 @@
+name: Rollback (Onceki Surume Don)
+
+on:
+  workflow_dispatch:
+    inputs:
+      aciklama:
+        description: 'Neden geri aliniyor (ornek: site patladi)'
+        required: true
+        type: string
+
+run-name: Rollback - ${{ github.actor }} - ${{ inputs.aciklama }}
+
+concurrency:
+  group: wsl-self-hosted-runner
+  cancel-in-progress: true
+
+jobs:
+  rollback:
+    runs-on: self-hosted
+
+    steps:
+      - name: Onceki surum var mi kontrol et
+        run: |
+          if [ ! -d /opt/helloapi.previous ]; then
+            echo "Geri alinacak onceki surum yok (/opt/helloapi.previous)"
+            echo "En az bir kez basarili deploy yapilmis olmali."
+            exit 1
+          fi
+          echo "Onceki surum bulundu, geri aliniyor..."
+
+      - name: Onceki surume geri al
+        run: |
+          pkill -f 'dotnet /opt/helloapi' || true
+          sleep 1
+          rm -rf /opt/helloapi
+          cp -a /opt/helloapi.previous /opt/helloapi
+          systemctl restart helloapi
+          echo "Rollback tamamlandi"
+
+      - name: Rollback ozeti
+        run: |
+          echo "## Rollback Ozeti" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Yapan: **${{ github.actor }}**" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Not: ${{ inputs.aciklama }}" >> "$GITHUB_STEP_SUMMARY"
+          if [ -f /opt/helloapi/.deploy-info ]; then
+            echo "- Geri alinan surum bilgisi:" >> "$GITHUB_STEP_SUMMARY"
+            cat /opt/helloapi/.deploy-info >> "$GITHUB_STEP_SUMMARY"
+          fi
