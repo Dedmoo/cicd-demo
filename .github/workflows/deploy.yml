@@ -7,6 +7,14 @@ on:
         description: 'Ne deploy ediliyor (ornek: deneme45 canliya al)'
         required: true
         type: string
+      deploy_kaynak:
+        description: 'Deploy kaynagi (buyuk projede CI artifact hizli)'
+        required: true
+        type: choice
+        options:
+          - kaynak_koddan_derle
+          - ci_artifact
+        default: kaynak_koddan_derle
 
 run-name: Deploy - ${{ github.actor }} - ${{ inputs.aciklama }}
 
@@ -17,6 +25,7 @@ concurrency:
 jobs:
   deploy:
     runs-on: self-hosted
+    environment: production
 
     steps:
       - name: Kodu indir (checkout)
@@ -27,44 +36,46 @@ jobs:
           COMMIT_MSG=$(git log -1 --pretty=%s)
           COMMIT_AUTHOR=$(git log -1 --pretty=%an)
           echo "Deploy eden (buton): ${{ github.actor }}"
+          echo "Deploy kaynagi: ${{ inputs.deploy_kaynak }}"
           echo "Commit mesaji: $COMMIT_MSG"
           echo "Commit atan: $COMMIT_AUTHOR"
           echo "Deploy notu: ${{ inputs.aciklama }}"
           echo "## Deploy Ozeti" >> "$GITHUB_STEP_SUMMARY"
           echo "- Deploy eden: **${{ github.actor }}**" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Kaynak: **${{ inputs.deploy_kaynak }}**" >> "$GITHUB_STEP_SUMMARY"
           echo "- Commit: $COMMIT_MSG" >> "$GITHUB_STEP_SUMMARY"
           echo "- Commit atan: $COMMIT_AUTHOR" >> "$GITHUB_STEP_SUMMARY"
           echo "- Not: ${{ inputs.aciklama }}" >> "$GITHUB_STEP_SUMMARY"
 
-      - name: .NET surumunu dogrula
+      - name: .NET build ve test
+        if: inputs.deploy_kaynak == 'kaynak_koddan_derle'
+        uses: ./.github/actions/dotnet-build-test
+        with:
+          configuration: Release
+
+      - name: CI artifact indir
+        if: inputs.deploy_kaynak == 'ci_artifact'
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          if ! command -v dotnet >/dev/null 2>&1; then
-            echo "dotnet bulunamadi. WSL uzerinde .NET SDK kurulu olmali."
+          RUN_ID=$(gh run list \
+            --repo "${{ github.repository }}" \
+            --workflow=ci.yml \
+            --branch=main \
+            --status=success \
+            --limit=1 \
+            --json databaseId \
+            -q '.[0].databaseId')
+          if [ -z "$RUN_ID" ] || [ "$RUN_ID" = "null" ]; then
+            echo "Basarili CI run bulunamadi. Once main'e push yapip CI yesil olmali."
             exit 1
           fi
-          DOTNET_VERSION=$(dotnet --version)
-          echo "Makinedeki .NET SDK: $DOTNET_VERSION"
-          DOTNET_MAJOR=$(echo "$DOTNET_VERSION" | cut -d. -f1)
-          if [ "$DOTNET_MAJOR" -lt 8 ]; then
-            echo "NET 8 veya ustu SDK gerekli, bulunan: $DOTNET_VERSION"
-            exit 1
-          fi
-          if ! dotnet --list-runtimes | grep -q 'Microsoft.NETCore.App 8\.'; then
-            echo "NET 8 runtime eksik. Test ve canli calistirma icin WSL'e bir kez kurulmali:"
-            echo "curl -sSL https://dot.net/v1/dotnet-install.sh | bash -s -- --runtime dotnet --channel 8.0 --install-dir /usr/lib/dotnet"
-            echo "curl -sSL https://dot.net/v1/dotnet-install.sh | bash -s -- --runtime aspnetcore --channel 8.0 --install-dir /usr/lib/dotnet"
-            exit 1
-          fi
-          echo "NET 8 runtime mevcut"
-
-      - name: Bagimliliklari yukle (restore)
-        run: dotnet restore /p:UseSharedCompilation=false
-
-      - name: Projeyi derle (build)
-        run: dotnet build --no-restore --configuration Release /p:UseSharedCompilation=false
-
-      - name: Testleri calistir
-        run: dotnet test --no-build --configuration Release --verbosity normal /p:UseSharedCompilation=false
+          echo "CI artifact indiriliyor (run $RUN_ID)..."
+          gh run download "$RUN_ID" \
+            -R "${{ github.repository }}" \
+            -n helloapi-publish \
+            -D /tmp/helloapi-artifact
+          echo "ARTIFACT_DIR=/tmp/helloapi-artifact" >> "$GITHUB_ENV"
 
       - name: Mevcut surumu yedekle
         run: |
@@ -77,17 +88,28 @@ jobs:
             echo "Ilk deploy, geri alinacak onceki surum yok"
           fi
 
-      - name: Yayinla (publish)
+      - name: Yayinla (kaynak koddan)
+        if: inputs.deploy_kaynak == 'kaynak_koddan_derle'
         run: |
           STAGING=$(mktemp -d)
           dotnet publish HelloApi/HelloApi.csproj --configuration Release --output "$STAGING" /p:UseSharedCompilation=false
           mkdir -p /opt/helloapi
           rsync -a --delete "$STAGING/" /opt/helloapi/
           rm -rf "$STAGING"
+
+      - name: Yayinla (CI artifact)
+        if: inputs.deploy_kaynak == 'ci_artifact'
+        run: |
+          mkdir -p /opt/helloapi
+          rsync -a --delete "${ARTIFACT_DIR}/" /opt/helloapi/
+
+      - name: Deploy bilgisini kaydet
+        run: |
           cat > /opt/helloapi/.deploy-info <<EOF
           deploy_time=$(date -u +%Y-%m-%dT%H:%M:%SZ)
           commit=${{ github.sha }}
           deployed_by=${{ github.actor }}
+          deploy_kaynak=${{ inputs.deploy_kaynak }}
           note=${{ inputs.aciklama }}
           EOF
 
@@ -96,3 +118,24 @@ jobs:
           pkill -f 'dotnet /opt/helloapi' || true
           sleep 1
           systemctl restart helloapi
+
+      - name: Canli saglik kontrolu
+        id: health
+        continue-on-error: true
+        run: bash .github/scripts/verify-health.sh http://127.0.0.1:5191/health
+
+      - name: Saglik basarisiz - otomatik geri al
+        if: steps.health.outcome == 'failure'
+        run: |
+          if [ -d /opt/helloapi.previous ]; then
+            echo "Health check patladi, onceki surume otomatik geri aliniyor..."
+            bash .github/scripts/rollback-to-previous.sh
+            bash .github/scripts/verify-health.sh http://127.0.0.1:5191/health || true
+            echo "- Otomatik rollback yapildi (health check fail)" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Health check patladi ama onceki surum yok."
+          fi
+
+      - name: Deploy basarisiz (health check)
+        if: steps.health.outcome == 'failure'
+        run: exit 1
